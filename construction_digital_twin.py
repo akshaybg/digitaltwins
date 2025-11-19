@@ -1,0 +1,574 @@
+#!/usr/bin/env python3
+"""
+Construction Site Digital Twin
+A comprehensive system to monitor construction equipment, worker safety, 
+environmental conditions, and project progress in real-time.
+"""
+
+import time
+import random
+import json
+from datetime import datetime, timedelta
+from typing import Dict, Any, List
+from dataclasses import dataclass, asdict
+from enum import Enum
+import threading
+from flask import Flask, render_template, jsonify
+import uuid
+
+class EquipmentType(Enum):
+    EXCAVATOR = "excavator"
+    CRANE = "crane"
+    BULLDOZER = "bulldozer"
+    CONCRETE_MIXER = "concrete_mixer"
+    GENERATOR = "generator"
+    COMPACTOR = "compactor"
+
+class SafetyStatus(Enum):
+    SAFE = "safe"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+class ProjectPhase(Enum):
+    FOUNDATION = "foundation"
+    STRUCTURE = "structure"
+    ROOFING = "roofing"
+    FINISHING = "finishing"
+
+@dataclass
+class Location:
+    x: float
+    y: float
+    z: float = 0.0
+
+@dataclass
+class Worker:
+    id: str
+    name: str
+    location: Location
+    heart_rate: int
+    body_temp: float
+    has_helmet: bool
+    has_vest: bool
+    last_seen: datetime
+
+class ConstructionEquipment:
+    def __init__(self, equipment_id: str, equipment_type: EquipmentType, location: Location):
+        self.id = equipment_id
+        self.type = equipment_type
+        self.location = location
+        self.is_active = False
+        self.fuel_level = 100.0
+        self.engine_temp = 20.0
+        self.operating_hours = 0.0
+        self.vibration_level = 0.0
+        self.load_weight = 0.0
+        self.alerts = []
+        self.telemetry_history = []
+        
+        # Movement tracking for mobile equipment
+        self.target_location = location
+        self.movement_speed = 0.0  # units per update
+        self.rotation_angle = 0.0  # degrees
+        self.is_moving = False
+        self.movement_path = []  # list of waypoints for complex movements
+        self.path_index = 0
+        
+        # Set default movement parameters based on equipment type
+        if equipment_type == EquipmentType.CONCRETE_MIXER:
+            self.movement_speed = 2.0  # Slower, realistic truck speed
+            self.setup_truck_routes()
+        elif equipment_type == EquipmentType.EXCAVATOR:
+            self.movement_speed = 1.0  # Slow movement for excavators
+        elif equipment_type == EquipmentType.BULLDOZER:
+            self.movement_speed = 1.5  # Moderate speed for bulldozers
+        
+    def start_equipment(self):
+        self.is_active = True
+        print(f"✅ Started {self.type.value}: {self.id}")
+        
+    def stop_equipment(self):
+        self.is_active = False
+        self.is_moving = False
+        print(f"🛑 Stopped {self.type.value}: {self.id}")
+        
+    def setup_truck_routes(self):
+        """Setup predefined routes for concrete mixer trucks"""
+        if self.type == EquipmentType.CONCRETE_MIXER:
+            # Define a realistic truck route: entrance -> loading -> construction sites -> exit
+            self.movement_path = [
+                Location(250, 190),  # Site entrance
+                Location(200, 160),  # Approach road
+                Location(150, 130),  # Concrete plant/loading area
+                Location(100, 100),  # Construction site A
+                Location(70, 80),    # Pour location 1
+                Location(90, 60),    # Pour location 2
+                Location(120, 40),   # Construction site B
+                Location(180, 70),   # Exit route
+                Location(230, 120),  # Access road
+                Location(280, 180),  # Site exit
+            ]
+            self.path_index = 0
+            self.target_location = self.movement_path[0] if self.movement_path else self.location
+            
+    def update_movement(self):
+        """Update equipment position based on movement patterns"""
+        if not self.is_active or not self.is_moving:
+            return
+            
+        if self.type == EquipmentType.CONCRETE_MIXER and self.movement_path:
+            # Follow predefined path for trucks
+            self.follow_path()
+        else:
+            # Simple random movement for other equipment
+            self.random_movement()
+            
+    def follow_path(self):
+        """Follow predefined waypoint path"""
+        if not self.movement_path:
+            return
+            
+        current_target = self.movement_path[self.path_index]
+        dx = current_target.x - self.location.x
+        dy = current_target.y - self.location.y
+        distance = (dx**2 + dy**2)**0.5
+        
+        if distance < 5.0:  # Reached waypoint
+            self.path_index = (self.path_index + 1) % len(self.movement_path)
+            current_target = self.movement_path[self.path_index]
+            dx = current_target.x - self.location.x
+            dy = current_target.y - self.location.y
+            distance = (dx**2 + dy**2)**0.5
+            
+        if distance > 0:
+            # Move toward target
+            move_x = (dx / distance) * self.movement_speed
+            move_y = (dy / distance) * self.movement_speed
+            self.location.x += move_x
+            self.location.y += move_y
+            
+            # Update rotation angle based on movement direction
+            import math
+            self.rotation_angle = math.atan2(dy, dx) * 180 / math.pi
+            
+    def random_movement(self):
+        """Random movement pattern for non-truck equipment"""
+        # Small random movements within a constrained area
+        self.location.x += random.uniform(-0.5, 0.5) * self.movement_speed
+        self.location.y += random.uniform(-0.5, 0.5) * self.movement_speed
+        
+        # Keep equipment within site boundaries
+        self.location.x = max(10, min(290, self.location.x))
+        self.location.y = max(10, min(190, self.location.y))
+        
+    def update_telemetry(self):
+        if not self.is_active:
+            return
+            
+        # Simulate realistic equipment telemetry
+        if self.type == EquipmentType.EXCAVATOR:
+            self.engine_temp += random.uniform(-1, 3)
+            self.fuel_level -= random.uniform(0.1, 0.5)
+            self.vibration_level = random.uniform(10, 50)
+            self.load_weight = random.uniform(0, 15000)  # kg
+        elif self.type == EquipmentType.CRANE:
+            self.engine_temp += random.uniform(-0.5, 2)
+            self.fuel_level -= random.uniform(0.05, 0.3)
+            self.vibration_level = random.uniform(5, 25)
+            self.load_weight = random.uniform(0, 50000)  # kg
+        elif self.type == EquipmentType.CONCRETE_MIXER:
+            self.engine_temp += random.uniform(0, 4)
+            self.fuel_level -= random.uniform(0.2, 0.8)
+            self.vibration_level = random.uniform(20, 80)
+            
+        # Add some randomness
+        self.engine_temp = max(15, min(120, self.engine_temp))
+        self.fuel_level = max(0, self.fuel_level)
+        self.operating_hours += 0.033  # 2 minutes per hour
+        
+        # Record telemetry
+        telemetry = {
+            "timestamp": datetime.now(),
+            "engine_temp": round(self.engine_temp, 2),
+            "fuel_level": round(self.fuel_level, 2),
+            "vibration_level": round(self.vibration_level, 2),
+            "load_weight": round(self.load_weight, 2),
+            "is_active": self.is_active
+        }
+        
+        self.telemetry_history.append(telemetry)
+        if len(self.telemetry_history) > 100:
+            self.telemetry_history.pop(0)
+            
+        # Check for alerts
+        self.check_alerts()
+        
+        # Update movement if active
+        self.update_movement()
+        
+    def check_alerts(self):
+        self.alerts.clear()
+        
+        if self.engine_temp > 90:
+            self.alerts.append("HIGH_ENGINE_TEMP")
+        if self.fuel_level < 10:
+            self.alerts.append("LOW_FUEL")
+        if self.vibration_level > 70:
+            self.alerts.append("HIGH_VIBRATION")
+        if self.type == EquipmentType.CRANE and self.load_weight > 45000:
+            self.alerts.append("OVERLOAD")
+            
+    def get_status(self):
+        return {
+            "id": self.id,
+            "type": self.type.value,
+            "location": asdict(self.location),
+            "is_active": self.is_active,
+            "engine_temp": self.engine_temp,
+            "fuel_level": self.fuel_level,
+            "vibration_level": self.vibration_level,
+            "load_weight": self.load_weight,
+            "operating_hours": round(self.operating_hours, 2),
+            "alerts": self.alerts,
+            "last_updated": datetime.now(),
+            # Movement data
+            "is_moving": self.is_moving,
+            "movement_speed": self.movement_speed,
+            "rotation_angle": self.rotation_angle,
+            "target_location": asdict(self.target_location) if hasattr(self, 'target_location') else None,
+            "path_progress": f"{self.path_index + 1}/{len(self.movement_path)}" if hasattr(self, 'movement_path') and self.movement_path else "N/A",
+            "movement_path": [asdict(p) for p in self.movement_path] if hasattr(self, 'movement_path') and self.movement_path else []
+        }
+
+class SafetyMonitor:
+    def __init__(self):
+        self.workers = {}
+        self.safety_violations = []
+        self.restricted_zones = [
+            {"name": "Crane Operation Zone", "center": Location(100, 50), "radius": 30},
+            {"name": "Deep Excavation", "center": Location(200, 100), "radius": 20}
+        ]
+        
+    def add_worker(self, worker: Worker):
+        self.workers[worker.id] = worker
+        
+    def update_worker_status(self, worker_id: str, location: Location, heart_rate: int, 
+                           body_temp: float, has_helmet: bool, has_vest: bool):
+        if worker_id in self.workers:
+            worker = self.workers[worker_id]
+            worker.location = location
+            worker.heart_rate = heart_rate
+            worker.body_temp = body_temp
+            worker.has_helmet = has_helmet
+            worker.has_vest = has_vest
+            worker.last_seen = datetime.now()
+            
+            self.check_safety_violations(worker)
+            
+    def check_safety_violations(self, worker: Worker):
+        violations = []
+        
+        # Check PPE compliance
+        if not worker.has_helmet:
+            violations.append(f"Worker {worker.name} missing safety helmet")
+        if not worker.has_vest:
+            violations.append(f"Worker {worker.name} missing safety vest")
+            
+        # Check health metrics
+        if worker.heart_rate > 120:
+            violations.append(f"Worker {worker.name} elevated heart rate: {worker.heart_rate}")
+        if worker.body_temp > 38.5:
+            violations.append(f"Worker {worker.name} high body temperature: {worker.body_temp}°C")
+            
+        # Check restricted zones
+        for zone in self.restricted_zones:
+            distance = ((worker.location.x - zone["center"].x)**2 + 
+                       (worker.location.y - zone["center"].y)**2)**0.5
+            if distance < zone["radius"]:
+                violations.append(f"Worker {worker.name} in restricted zone: {zone['name']}")
+                
+        # Add violations with timestamp
+        for violation in violations:
+            self.safety_violations.append({
+                "timestamp": datetime.now(),
+                "violation": violation,
+                "severity": "critical" if "missing" in violation or "restricted zone" in violation else "warning"
+            })
+            
+        # Keep only recent violations (last 24 hours)
+        cutoff = datetime.now() - timedelta(hours=24)
+        self.safety_violations = [v for v in self.safety_violations if v["timestamp"] > cutoff]
+
+class ProgressTracker:
+    def __init__(self):
+        self.current_phase = ProjectPhase.FOUNDATION
+        self.phase_progress = {
+            ProjectPhase.FOUNDATION: 0.0,
+            ProjectPhase.STRUCTURE: 0.0,
+            ProjectPhase.ROOFING: 0.0,
+            ProjectPhase.FINISHING: 0.0
+        }
+        self.milestones = []
+        self.weather_impact = 0.0
+        
+    def update_progress(self, phase: ProjectPhase, progress: float):
+        self.phase_progress[phase] = min(100.0, max(0.0, progress))
+        
+        # Auto-advance phases
+        if progress >= 100.0 and phase == self.current_phase:
+            phases = list(ProjectPhase)
+            current_idx = phases.index(self.current_phase)
+            if current_idx < len(phases) - 1:
+                self.current_phase = phases[current_idx + 1]
+                
+    def add_milestone(self, name: str, completed: bool = False):
+        self.milestones.append({
+            "name": name,
+            "completed": completed,
+            "timestamp": datetime.now()
+        })
+        
+    def get_overall_progress(self):
+        total_progress = sum(self.phase_progress.values())
+        return round(total_progress / len(self.phase_progress), 2)
+
+class EnvironmentalMonitor:
+    def __init__(self):
+        self.temperature = 20.0
+        self.humidity = 50.0
+        self.wind_speed = 5.0
+        self.air_quality = 85.0
+        self.noise_level = 60.0
+        self.dust_level = 20.0
+        
+    def update_conditions(self):
+        # Simulate changing environmental conditions
+        self.temperature += random.uniform(-2, 2)
+        self.humidity += random.uniform(-5, 5)
+        self.wind_speed += random.uniform(-2, 3)
+        self.air_quality += random.uniform(-3, 3)
+        self.noise_level += random.uniform(-10, 15)
+        self.dust_level += random.uniform(-5, 10)
+        
+        # Keep within realistic bounds
+        self.temperature = max(-10, min(45, self.temperature))
+        self.humidity = max(0, min(100, self.humidity))
+        self.wind_speed = max(0, min(50, self.wind_speed))
+        self.air_quality = max(0, min(100, self.air_quality))
+        self.noise_level = max(30, min(120, self.noise_level))
+        self.dust_level = max(0, min(100, self.dust_level))
+        
+    def get_status(self):
+        return {
+            "temperature": round(self.temperature, 1),
+            "humidity": round(self.humidity, 1),
+            "wind_speed": round(self.wind_speed, 1),
+            "air_quality": round(self.air_quality, 1),
+            "noise_level": round(self.noise_level, 1),
+            "dust_level": round(self.dust_level, 1),
+            "timestamp": datetime.now()
+        }
+
+class ConstructionSiteDigitalTwin:
+    def __init__(self, site_name: str):
+        self.site_name = site_name
+        self.equipment = {}
+        self.safety_monitor = SafetyMonitor()
+        self.progress_tracker = ProgressTracker()
+        self.environmental_monitor = EnvironmentalMonitor()
+        self.start_time = datetime.now()
+        self.is_running = False
+        
+        # Initialize with sample equipment
+        self.add_equipment("EXC001", EquipmentType.EXCAVATOR, Location(50, 25))
+        self.add_equipment("CRANE001", EquipmentType.CRANE, Location(100, 50))
+        self.add_equipment("MIX001", EquipmentType.CONCRETE_MIXER, Location(150, 75))
+        self.add_equipment("BULL001", EquipmentType.BULLDOZER, Location(75, 100))
+        
+        # Add sample workers
+        self.add_sample_workers()
+        
+    def add_equipment(self, equipment_id: str, equipment_type: EquipmentType, location: Location):
+        equipment = ConstructionEquipment(equipment_id, equipment_type, location)
+        self.equipment[equipment_id] = equipment
+        print(f"➕ Added {equipment_type.value}: {equipment_id}")
+        
+    def add_sample_workers(self):
+        workers = [
+            Worker("W001", "John Smith", Location(60, 30), 75, 36.5, True, True, datetime.now()),
+            Worker("W002", "Maria Garcia", Location(110, 60), 82, 36.8, True, False, datetime.now()),
+            Worker("W003", "Ahmed Ali", Location(200, 95), 95, 37.1, False, True, datetime.now()),
+            Worker("W004", "Sarah Johnson", Location(80, 105), 88, 36.6, True, True, datetime.now())
+        ]
+        
+        for worker in workers:
+            self.safety_monitor.add_worker(worker)
+            
+    def start_operations(self):
+        self.is_running = True
+        for equipment in self.equipment.values():
+            equipment.start_equipment()
+            # Start movement for trucks with a slight delay
+            if equipment.type == EquipmentType.CONCRETE_MIXER:
+                equipment.is_moving = True
+            
+    def stop_operations(self):
+        self.is_running = False
+        for equipment in self.equipment.values():
+            equipment.stop_equipment()
+            
+    def update_system(self):
+        if not self.is_running:
+            return
+            
+        # Update equipment telemetry
+        for equipment in self.equipment.values():
+            equipment.update_telemetry()
+            
+        # Update environmental conditions
+        self.environmental_monitor.update_conditions()
+        
+        # Simulate worker movements and status updates
+        for worker_id, worker in self.safety_monitor.workers.items():
+            # Simulate movement
+            worker.location.x += random.uniform(-5, 5)
+            worker.location.y += random.uniform(-5, 5)
+            worker.location.x = max(0, min(300, worker.location.x))
+            worker.location.y = max(0, min(200, worker.location.y))
+            
+            # Update worker status
+            self.safety_monitor.update_worker_status(
+                worker_id, worker.location,
+                random.randint(70, 120),
+                random.uniform(36.0, 38.0),
+                random.choice([True, False]) if worker_id == "W003" else True,
+                random.choice([True, False]) if worker_id == "W002" else True
+            )
+            
+        # Simulate progress updates
+        if random.random() < 0.1:  # 10% chance each update
+            phase = self.progress_tracker.current_phase
+            current_progress = self.progress_tracker.phase_progress[phase]
+            if current_progress < 100:
+                self.progress_tracker.update_progress(phase, current_progress + random.uniform(0.5, 2.0))
+                
+    def get_dashboard_data(self):
+        """Get all data for the web dashboard"""
+        return {
+            "site_info": {
+                "name": self.site_name,
+                "start_time": self.start_time,
+                "is_running": self.is_running,
+                "uptime": str(datetime.now() - self.start_time)
+            },
+            "equipment": {eq_id: eq.get_status() for eq_id, eq in self.equipment.items()},
+            "workers": {
+                worker_id: {
+                    "id": worker.id,
+                    "name": worker.name,
+                    "location": asdict(worker.location),
+                    "heart_rate": worker.heart_rate,
+                    "body_temp": worker.body_temp,
+                    "has_helmet": worker.has_helmet,
+                    "has_vest": worker.has_vest,
+                    "last_seen": worker.last_seen
+                } for worker_id, worker in self.safety_monitor.workers.items()
+            },
+            "safety": {
+                "violations": self.safety_monitor.safety_violations[-10:],  # Last 10 violations
+                "restricted_zones": self.safety_monitor.restricted_zones
+            },
+            "progress": {
+                "current_phase": self.progress_tracker.current_phase.value,
+                "phase_progress": {phase.value: progress for phase, progress in self.progress_tracker.phase_progress.items()},
+                "overall_progress": self.progress_tracker.get_overall_progress(),
+                "milestones": self.progress_tracker.milestones[-5:]  # Last 5 milestones
+            },
+            "environment": self.environmental_monitor.get_status(),
+            "timestamp": datetime.now()
+        }
+        
+    def run_simulation(self, duration_seconds: int):
+        """Run the construction site simulation"""
+        print(f"\n🏗️  Starting Construction Site Digital Twin: {self.site_name}")
+        print(f"🚀 Simulation running for {duration_seconds} seconds...\n")
+        
+        self.start_operations()
+        
+        iterations = 0
+        while self.is_running and iterations < duration_seconds // 2:
+            iterations += 1
+            print(f"--- Iteration {iterations} ---")
+            
+            self.update_system()
+            
+            # Print summary
+            active_equipment = sum(1 for eq in self.equipment.values() if eq.is_active)
+            total_alerts = sum(len(eq.alerts) for eq in self.equipment.values())
+            safety_violations = len([v for v in self.safety_monitor.safety_violations 
+                                   if (datetime.now() - v["timestamp"]).seconds < 3600])  # Last hour
+            
+            print(f"  🏗️  Active Equipment: {active_equipment}/{len(self.equipment)}")
+            print(f"  ⚠️  Active Alerts: {total_alerts}")
+            print(f"  👷 Workers on Site: {len(self.safety_monitor.workers)}")
+            print(f"  🚨 Safety Violations (1h): {safety_violations}")
+            print(f"  📊 Overall Progress: {self.progress_tracker.get_overall_progress()}%")
+            print(f"  🌡️  Temperature: {self.environmental_monitor.temperature:.1f}°C")
+            print(f"  🔊 Noise Level: {self.environmental_monitor.noise_level:.1f} dB")
+            print()
+            
+            time.sleep(2)
+            
+        self.stop_operations()
+        print("✅ Construction Site Simulation completed!")
+        
+        # Print final summary
+        final_data = self.get_dashboard_data()
+        print(f"\n📊 Final Site Summary:")
+        print(f"  🏗️  Site: {final_data['site_info']['name']}")
+        print(f"  ⏱️  Uptime: {final_data['site_info']['uptime']}")
+        print(f"  📈 Overall Progress: {final_data['progress']['overall_progress']}%")
+        print(f"  🔧 Equipment Status: {len([eq for eq in final_data['equipment'].values() if eq['is_active']])}/{len(final_data['equipment'])} active")
+
+# Flask Web Application for Visualization
+app = Flask(__name__)
+construction_site = ConstructionSiteDigitalTwin("Metro Construction Project - Phase 1")
+
+@app.route('/')
+def index():
+    """Main route - goes directly to 3D visualization"""
+    return render_template('construction_3d_dashboard.html')
+
+@app.route('/api/dashboard-data')
+def api_dashboard_data():
+    return jsonify(construction_site.get_dashboard_data())
+
+@app.route('/api/start-operations', methods=['POST'])
+def start_operations():
+    construction_site.start_operations()
+    return jsonify({"status": "started"})
+
+@app.route('/api/stop-operations', methods=['POST'])
+def stop_operations():
+    construction_site.stop_operations()
+    return jsonify({"status": "stopped"})
+
+def background_updates():
+    """Background thread to continuously update the system"""
+    while True:
+        construction_site.update_system()
+        time.sleep(2)
+
+if __name__ == "__main__":
+    print("🏗️  Construction Site Digital Twin")
+    print("=====================================")
+    
+    # Start background updates
+    update_thread = threading.Thread(target=background_updates, daemon=True)
+    update_thread.start()
+    
+    # Start Flask development server
+    print("\n🌐 Starting 3D Construction Site Visualization at http://localhost:8001")
+    print("   Open your browser and watch the site in real-time 3D!")
+
+    app.run(host='0.0.0.0', port=8001, debug=False, threaded=True)
