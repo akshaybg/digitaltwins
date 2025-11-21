@@ -295,14 +295,14 @@ class ConstructionEquipment:
     def setup_truck_routes(self):
         """Setup predefined routes for concrete mixer trucks"""
         if self.type == EquipmentType.CONCRETE_MIXER:
-            # Straight line loop: Y from 0 to 150 at X=150, step of 10
+            # Straight line loop: X from 0 to 300 at Y=150, step of 10
             self.movement_path = []
-            # Forward: Y 0 to 150
-            for y in range(0, 160, 10):
-                self.movement_path.append(Location(150, y))
-            # Backward: Y 140 to 10 (exclude endpoints to avoid duplicates)
-            for y in range(140, 0, -10):
-                self.movement_path.append(Location(150, y))
+            # Forward: X 0 to 300
+            for x in range(0, 310, 10):
+                self.movement_path.append(Location(x, 150))
+            # Backward: X 290 to 10 (exclude endpoints to avoid duplicates)
+            for x in range(290, 0, -10):
+                self.movement_path.append(Location(x, 150))
             self.path_index = 0
             # Start truck at first waypoint
             self.location = Location(self.movement_path[0].x, self.movement_path[0].y)
