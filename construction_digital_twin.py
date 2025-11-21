@@ -8,12 +8,13 @@ environmental conditions, and project progress in real-time.
 import time
 import random
 import json
+import sqlite3
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
 from dataclasses import dataclass, asdict
 from enum import Enum
 import threading
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import uuid
 
 class EquipmentType(Enum):
@@ -51,6 +52,205 @@ class Worker:
     has_helmet: bool
     has_vest: bool
     last_seen: datetime
+
+
+class TelemetryDatabase:
+    """SQLite database for high-frequency telemetry storage (10ms intervals)"""
+
+    def __init__(self, db_path: str = "construction_telemetry.db"):
+        self.db_path = db_path
+        self.conn = None
+        self.lock = threading.Lock()
+        self._init_database()
+
+    def _init_database(self):
+        """Initialize database schema"""
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        cursor = self.conn.cursor()
+
+        # Equipment telemetry table (10ms data)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS equipment_telemetry (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp REAL,
+                equipment_id TEXT,
+                equipment_type TEXT,
+                pos_x REAL,
+                pos_y REAL,
+                pos_z REAL,
+                engine_temp REAL,
+                fuel_level REAL,
+                vibration_level REAL,
+                load_weight REAL,
+                is_active INTEGER,
+                is_moving INTEGER,
+                rotation_angle REAL,
+                movement_speed REAL
+            )
+        """)
+
+        # Worker telemetry table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS worker_telemetry (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp REAL,
+                worker_id TEXT,
+                worker_name TEXT,
+                pos_x REAL,
+                pos_y REAL,
+                pos_z REAL,
+                heart_rate INTEGER,
+                body_temp REAL,
+                has_helmet INTEGER,
+                has_vest INTEGER
+            )
+        """)
+
+        # Environment telemetry table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS environment_telemetry (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp REAL,
+                temperature REAL,
+                humidity REAL,
+                wind_speed REAL,
+                air_quality REAL,
+                noise_level REAL,
+                dust_level REAL
+            )
+        """)
+
+        # Create indices for faster queries
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_equip_ts ON equipment_telemetry(timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_equip_id ON equipment_telemetry(equipment_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_worker_ts ON worker_telemetry(timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_env_ts ON environment_telemetry(timestamp)")
+
+        self.conn.commit()
+
+    def insert_equipment_telemetry(self, equipment):
+        """Insert equipment telemetry record"""
+        with self.lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO equipment_telemetry (
+                    timestamp, equipment_id, equipment_type, pos_x, pos_y, pos_z,
+                    engine_temp, fuel_level, vibration_level, load_weight,
+                    is_active, is_moving, rotation_angle, movement_speed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                time.time(),
+                equipment.id,
+                equipment.type.value,
+                equipment.location.x,
+                equipment.location.y,
+                equipment.location.z,
+                equipment.engine_temp,
+                equipment.fuel_level,
+                equipment.vibration_level,
+                equipment.load_weight,
+                1 if equipment.is_active else 0,
+                1 if equipment.is_moving else 0,
+                equipment.rotation_angle,
+                equipment.movement_speed
+            ))
+            self.conn.commit()
+
+    def insert_worker_telemetry(self, worker):
+        """Insert worker telemetry record"""
+        with self.lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO worker_telemetry (
+                    timestamp, worker_id, worker_name, pos_x, pos_y, pos_z,
+                    heart_rate, body_temp, has_helmet, has_vest
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                time.time(),
+                worker.id,
+                worker.name,
+                worker.location.x,
+                worker.location.y,
+                worker.location.z,
+                worker.heart_rate,
+                worker.body_temp,
+                1 if worker.has_helmet else 0,
+                1 if worker.has_vest else 0
+            ))
+            self.conn.commit()
+
+    def insert_environment_telemetry(self, env):
+        """Insert environment telemetry record"""
+        with self.lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO environment_telemetry (
+                    timestamp, temperature, humidity, wind_speed,
+                    air_quality, noise_level, dust_level
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                time.time(),
+                env.temperature,
+                env.humidity,
+                env.wind_speed,
+                env.air_quality,
+                env.noise_level,
+                env.dust_level
+            ))
+            self.conn.commit()
+
+    def get_equipment_telemetry(self, equipment_id: str = None, limit: int = 100) -> List[Dict]:
+        """Get recent equipment telemetry records"""
+        with self.lock:
+            cursor = self.conn.cursor()
+            if equipment_id:
+                cursor.execute("""
+                    SELECT * FROM equipment_telemetry
+                    WHERE equipment_id = ?
+                    ORDER BY timestamp DESC LIMIT ?
+                """, (equipment_id, limit))
+            else:
+                cursor.execute("""
+                    SELECT * FROM equipment_telemetry
+                    ORDER BY timestamp DESC LIMIT ?
+                """, (limit,))
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def get_worker_telemetry(self, worker_id: str = None, limit: int = 100) -> List[Dict]:
+        """Get recent worker telemetry records"""
+        with self.lock:
+            cursor = self.conn.cursor()
+            if worker_id:
+                cursor.execute("""
+                    SELECT * FROM worker_telemetry
+                    WHERE worker_id = ?
+                    ORDER BY timestamp DESC LIMIT ?
+                """, (worker_id, limit))
+            else:
+                cursor.execute("""
+                    SELECT * FROM worker_telemetry
+                    ORDER BY timestamp DESC LIMIT ?
+                """, (limit,))
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def get_environment_telemetry(self, limit: int = 100) -> List[Dict]:
+        """Get recent environment telemetry records"""
+        with self.lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT * FROM environment_telemetry
+                ORDER BY timestamp DESC LIMIT ?
+            """, (limit,))
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def close(self):
+        """Close database connection"""
+        if self.conn:
+            self.conn.close()
+
 
 class ConstructionEquipment:
     def __init__(self, equipment_id: str, equipment_type: EquipmentType, location: Location):
@@ -376,15 +576,20 @@ class ConstructionSiteDigitalTwin:
         self.safety_monitor = SafetyMonitor()
         self.progress_tracker = ProgressTracker()
         self.environmental_monitor = EnvironmentalMonitor()
+        self.telemetry_db = TelemetryDatabase()
         self.start_time = datetime.now()
         self.is_running = False
-        
+
+        # Telemetry collection thread (10ms interval)
+        self.telemetry_thread = None
+        self.telemetry_running = False
+
         # Initialize with sample equipment
         self.add_equipment("EXC001", EquipmentType.EXCAVATOR, Location(50, 25))
         self.add_equipment("CRANE001", EquipmentType.CRANE, Location(100, 50))
         self.add_equipment("MIX001", EquipmentType.CONCRETE_MIXER, Location(150, 75))
         self.add_equipment("BULL001", EquipmentType.BULLDOZER, Location(75, 100))
-        
+
         # Add sample workers
         self.add_sample_workers()
         
@@ -395,10 +600,10 @@ class ConstructionSiteDigitalTwin:
         
     def add_sample_workers(self):
         workers = [
-            Worker("W001", "John Smith", Location(60, 30), 75, 36.5, True, True, datetime.now()),
-            Worker("W002", "Maria Garcia", Location(110, 60), 82, 36.8, True, False, datetime.now()),
-            Worker("W003", "Ahmed Ali", Location(200, 95), 95, 37.1, False, True, datetime.now()),
-            Worker("W004", "Sarah Johnson", Location(80, 105), 88, 36.6, True, True, datetime.now())
+            Worker("W001", "Muniraju", Location(60, 30), 75, 36.5, True, True, datetime.now()),
+            Worker("W002", "Siddha", Location(110, 60), 82, 36.8, True, False, datetime.now()),
+            Worker("W003", "Ranga", Location(200, 95), 95, 37.1, False, True, datetime.now()),
+            Worker("W004", "Peddanna", Location(80, 105), 88, 36.6, True, True, datetime.now())
         ]
         
         for worker in workers:
@@ -411,11 +616,51 @@ class ConstructionSiteDigitalTwin:
             # Start movement for trucks with a slight delay
             if equipment.type == EquipmentType.CONCRETE_MIXER:
                 equipment.is_moving = True
-            
+        # Start 10ms telemetry collection
+        self.start_telemetry_collection()
+
     def stop_operations(self):
         self.is_running = False
+        self.stop_telemetry_collection()
         for equipment in self.equipment.values():
             equipment.stop_equipment()
+
+    def start_telemetry_collection(self):
+        """Start high-frequency telemetry collection (10ms intervals)"""
+        if self.telemetry_running:
+            return
+        self.telemetry_running = True
+        self.telemetry_thread = threading.Thread(target=self._telemetry_loop, daemon=True)
+        self.telemetry_thread.start()
+        print("📊 Started high-frequency telemetry collection (10ms)")
+
+    def stop_telemetry_collection(self):
+        """Stop telemetry collection"""
+        self.telemetry_running = False
+        if self.telemetry_thread:
+            self.telemetry_thread.join(timeout=1.0)
+        print("📊 Stopped telemetry collection")
+
+    def _telemetry_loop(self):
+        """High-frequency telemetry collection loop (10ms)"""
+        while self.telemetry_running:
+            try:
+                # Collect equipment telemetry
+                for equipment in self.equipment.values():
+                    if equipment.is_active:
+                        self.telemetry_db.insert_equipment_telemetry(equipment)
+
+                # Collect worker telemetry
+                for worker in self.safety_monitor.workers.values():
+                    self.telemetry_db.insert_worker_telemetry(worker)
+
+                # Collect environment telemetry
+                self.telemetry_db.insert_environment_telemetry(self.environmental_monitor)
+
+            except Exception as e:
+                print(f"Telemetry collection error: {e}")
+
+            time.sleep(0.01)  # 10ms interval
             
     def update_system(self):
         if not self.is_running:
@@ -552,6 +797,29 @@ def start_operations():
 def stop_operations():
     construction_site.stop_operations()
     return jsonify({"status": "stopped"})
+
+@app.route('/api/telemetry/equipment')
+def get_equipment_telemetry():
+    """Get equipment telemetry data"""
+    equipment_id = request.args.get('equipment_id')
+    limit = request.args.get('limit', 100, type=int)
+    data = construction_site.telemetry_db.get_equipment_telemetry(equipment_id, limit)
+    return jsonify(data)
+
+@app.route('/api/telemetry/workers')
+def get_worker_telemetry():
+    """Get worker telemetry data"""
+    worker_id = request.args.get('worker_id')
+    limit = request.args.get('limit', 100, type=int)
+    data = construction_site.telemetry_db.get_worker_telemetry(worker_id, limit)
+    return jsonify(data)
+
+@app.route('/api/telemetry/environment')
+def get_environment_telemetry():
+    """Get environment telemetry data"""
+    limit = request.args.get('limit', 100, type=int)
+    data = construction_site.telemetry_db.get_environment_telemetry(limit)
+    return jsonify(data)
 
 def background_updates():
     """Background thread to continuously update the system"""
