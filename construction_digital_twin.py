@@ -319,6 +319,10 @@ class ConstructionEquipment:
         if not self.is_active or not self.is_moving:
             return
 
+        # Kill switch check - freeze if active
+        if hasattr(self, 'kill_switch') and self.kill_switch:
+            return
+
         # Emergency evacuation takes priority
         if hasattr(self, 'is_evacuating') and self.is_evacuating:
             self.move_to_evacuation_point()
@@ -957,6 +961,39 @@ def clear_emergency():
     """Clear emergency and resume normal operations"""
     construction_site.clear_emergency()
     return jsonify({"status": "emergency_cleared"})
+
+@app.route('/api/truck/kill', methods=['POST'])
+def truck_kill():
+    """Kill switch - freeze truck at current location"""
+    data = request.get_json() or {}
+    equipment_id = data.get('equipment_id', 'MIX001')
+
+    if equipment_id in construction_site.equipment:
+        equipment = construction_site.equipment[equipment_id]
+        equipment.is_moving = False
+        equipment.kill_switch = True
+        return jsonify({
+            "status": "truck_frozen",
+            "equipment_id": equipment_id,
+            "location": {"x": equipment.location.x, "y": equipment.location.y}
+        })
+    return jsonify({"status": "error", "message": "Equipment not found"}), 404
+
+@app.route('/api/truck/resume', methods=['POST'])
+def truck_resume():
+    """Resume truck movement after kill switch"""
+    data = request.get_json() or {}
+    equipment_id = data.get('equipment_id', 'MIX001')
+
+    if equipment_id in construction_site.equipment:
+        equipment = construction_site.equipment[equipment_id]
+        equipment.kill_switch = False
+        equipment.is_moving = True
+        return jsonify({
+            "status": "truck_resumed",
+            "equipment_id": equipment_id
+        })
+    return jsonify({"status": "error", "message": "Equipment not found"}), 404
 
 @app.route('/api/telemetry/equipment')
 def get_equipment_telemetry():
