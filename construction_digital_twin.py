@@ -295,23 +295,14 @@ class ConstructionEquipment:
     def setup_truck_routes(self):
         """Setup predefined routes for concrete mixer trucks"""
         if self.type == EquipmentType.CONCRETE_MIXER:
-            # Define a smooth oval loop route (clockwise)
-            # Avoids Deep Excavation zone at (200, 100) radius 20
-            # and Crane Operation Zone at (100, 50) radius 30
-            self.movement_path = [
-                Location(250, 100),  # 0: East point (START) - shifted east to avoid excavation
-                Location(240, 140),  # 1: Northeast - shifted east
-                Location(185, 165),  # 2: North-northeast
-                Location(150, 175),  # 3: North point
-                Location(115, 165),  # 4: North-northwest
-                Location(60, 140),   # 5: Northwest - shifted west to avoid crane zone
-                Location(40, 100),   # 6: West point - shifted west
-                Location(60, 60),    # 7: Southwest - shifted to avoid crane zone
-                Location(115, 20),   # 8: South-southwest - shifted south
-                Location(150, 10),   # 9: South point
-                Location(185, 20),   # 10: South-southeast
-                Location(240, 60),   # 11: Southeast - shifted east to avoid excavation
-            ]
+            # Straight line loop: X from 0 to 150 at Y=150, step of 10
+            self.movement_path = []
+            # Forward: 0 to 150
+            for x in range(0, 160, 10):
+                self.movement_path.append(Location(x, 150))
+            # Backward: 140 to 10 (exclude endpoints to avoid duplicates)
+            for x in range(140, 0, -10):
+                self.movement_path.append(Location(x, 150))
             self.path_index = 0
             # Start truck at first waypoint
             self.location = Location(self.movement_path[0].x, self.movement_path[0].y)
