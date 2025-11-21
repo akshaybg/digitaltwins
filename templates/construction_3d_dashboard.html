@@ -340,6 +340,7 @@
                     <button class="btn btn-primary" onclick="resetCamera()">🏠 Reset View</button>
                     <button class="btn btn-primary" onclick="toggleWireframe()">📐 Wireframe</button>
                     <button class="btn btn-primary" onclick="toggleGrid()">⚏ Grid</button>
+                    <button id="toggleCoordsBtn" class="btn btn-secondary" onclick="toggleCoordinateLabels()">📍 Show Coords</button>
                 </div>
                 
                 <div class="control-group">
@@ -776,7 +777,10 @@
             gridHelper = new THREE.GridHelper(600, 30, 0x444444, 0x222222);
             gridHelper.position.y = 0.5;
             scene.add(gridHelper);
-            
+
+            // Coordinate labels (initially hidden)
+            createCoordinateLabels();
+
             // Buildings under construction
             createBuildingStructures();
         }
@@ -806,7 +810,94 @@
             texture.repeat.set(8, 8);
             return texture;
         }
-        
+
+        // Coordinate labels group
+        let coordinateLabelsGroup = null;
+        let showCoordinates = false;
+
+        function createCoordinateLabels() {
+            coordinateLabelsGroup = new THREE.Group();
+            coordinateLabelsGroup.visible = false;
+
+            // Create sprite material for text labels
+            function createTextSprite(text, color = '#00ff00') {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = color;
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, 64, 32);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const material = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(material);
+                sprite.scale.set(20, 10, 1);
+                return sprite;
+            }
+
+            // X-axis labels - Site X: 0-300, 3D X = siteX - 300
+            for (let siteX = 0; siteX <= 300; siteX += 50) {
+                const x3d = siteX - 300;
+                const label = createTextSprite(`${siteX}`, '#00ffff');
+                label.position.set(x3d, 5, -210);
+                coordinateLabelsGroup.add(label);
+            }
+
+            // Y-axis labels - Site Y: 0-200, 3D Z = siteY - 200
+            for (let siteY = 0; siteY <= 200; siteY += 50) {
+                const z3d = siteY - 200;
+                const label = createTextSprite(`${siteY}`, '#ffff00');
+                label.position.set(-310, 5, z3d);
+                coordinateLabelsGroup.add(label);
+            }
+
+            // Axis labels
+            const xAxisLabel = createTextSprite('X →', '#00ffff');
+            xAxisLabel.position.set(50, 8, -210);
+            coordinateLabelsGroup.add(xAxisLabel);
+
+            const yAxisLabel = createTextSprite('Y ↓', '#ffff00');
+            yAxisLabel.position.set(-310, 8, 50);
+            coordinateLabelsGroup.add(yAxisLabel);
+
+            // Origin marker (0,0)
+            const originLabel = createTextSprite('(0,0)', '#ff0000');
+            originLabel.position.set(-300, 10, -200);
+            coordinateLabelsGroup.add(originLabel);
+
+            // Add axis lines
+            const xAxisGeom = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-300, 2, -200),
+                new THREE.Vector3(300, 2, -200)
+            ]);
+            const yAxisGeom = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-300, 2, -200),
+                new THREE.Vector3(-300, 2, 200)
+            ]);
+            const xAxis = new THREE.Line(xAxisGeom, new THREE.LineBasicMaterial({ color: 0x00ffff, linewidth: 2 }));
+            const yAxis = new THREE.Line(yAxisGeom, new THREE.LineBasicMaterial({ color: 0xffff00, linewidth: 2 }));
+            coordinateLabelsGroup.add(xAxis);
+            coordinateLabelsGroup.add(yAxis);
+
+            scene.add(coordinateLabelsGroup);
+        }
+
+        function toggleCoordinateLabels() {
+            showCoordinates = !showCoordinates;
+            if (coordinateLabelsGroup) {
+                coordinateLabelsGroup.visible = showCoordinates;
+            }
+            const btn = document.getElementById('toggleCoordsBtn');
+            if (btn) {
+                btn.textContent = showCoordinates ? '📍 Hide Coords' : '📍 Show Coords';
+                btn.classList.toggle('btn-success', showCoordinates);
+                btn.classList.toggle('btn-secondary', !showCoordinates);
+            }
+        }
+
         function createBoundaryFence() {
             const fenceGeometry = new THREE.BoxGeometry(2, 20, 2);
             const fenceMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
