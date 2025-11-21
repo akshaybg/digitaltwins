@@ -966,7 +966,7 @@ def clear_emergency():
 @app.route('/api/truck/kill', methods=['POST'])
 def truck_kill():
     """Kill switch - freeze truck at current location"""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     equipment_id = data.get('equipment_id', 'MIX001')
 
     if equipment_id in construction_site.equipment:
@@ -983,7 +983,7 @@ def truck_kill():
 @app.route('/api/truck/resume', methods=['POST'])
 def truck_resume():
     """Resume truck movement after kill switch"""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     equipment_id = data.get('equipment_id', 'MIX001')
 
     if equipment_id in construction_site.equipment:
