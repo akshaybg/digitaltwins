@@ -723,10 +723,11 @@ class ConstructionSiteDigitalTwin:
             equipment.is_evacuating = False
             if hasattr(equipment, 'evacuation_target'):
                 delattr(equipment, 'evacuation_target')
-            # Restore truck routes
+            # Restore truck routes (unless kill switch is active)
             if equipment.type == EquipmentType.CONCRETE_MIXER:
                 equipment.setup_truck_routes()
-                equipment.is_moving = True
+                if not getattr(equipment, 'kill_switch', False):
+                    equipment.is_moving = True
 
         # Reset worker evacuation state
         for worker in self.safety_monitor.workers.values():
@@ -738,9 +739,10 @@ class ConstructionSiteDigitalTwin:
         self.is_running = True
         for equipment in self.equipment.values():
             equipment.start_equipment()
-            # Start movement for trucks with a slight delay
+            # Start movement for trucks (unless kill switch is active)
             if equipment.type == EquipmentType.CONCRETE_MIXER:
-                equipment.is_moving = True
+                if not getattr(equipment, 'kill_switch', False):
+                    equipment.is_moving = True
         # Start 10ms telemetry collection
         self.start_telemetry_collection()
 
