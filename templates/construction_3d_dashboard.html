@@ -1880,7 +1880,11 @@
                     const mesh = equipmentMeshes[id];
                     let color = equipment.is_active ? 0x00ff88 : 0x666666;
                     if (equipment.alerts.length > 0) color = 0xff4757;
-                    
+                    // Kill switch - frozen truck shows red/orange pulsing
+                    if (equipment.kill_switch) {
+                        color = Math.sin(Date.now() * 0.005) > 0 ? 0xff0000 : 0xff6600;
+                    }
+
                     // Update color for all equipment parts
                     try {
                         updateEquipmentColors(mesh, color);

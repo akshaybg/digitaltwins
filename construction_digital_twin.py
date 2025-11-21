@@ -475,6 +475,7 @@ class ConstructionEquipment:
             "last_updated": datetime.now(),
             # Movement data
             "is_moving": self.is_moving,
+            "kill_switch": getattr(self, 'kill_switch', False),
             "movement_speed": self.movement_speed,
             "rotation_angle": self.rotation_angle,
             "target_location": asdict(self.target_location) if hasattr(self, 'target_location') else None,
