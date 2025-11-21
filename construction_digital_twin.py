@@ -296,20 +296,21 @@ class ConstructionEquipment:
         """Setup predefined routes for concrete mixer trucks"""
         if self.type == EquipmentType.CONCRETE_MIXER:
             # Define a smooth oval loop route (clockwise)
-            # Center around (150, 100), radius ~80x60
+            # Avoids Deep Excavation zone at (200, 100) radius 20
+            # and Crane Operation Zone at (100, 50) radius 30
             self.movement_path = [
-                Location(230, 100),  # 0: East point (START)
-                Location(215, 130),  # 1: Northeast
-                Location(185, 150),  # 2: North-northeast
-                Location(150, 160),  # 3: North point
-                Location(115, 150),  # 4: North-northwest
-                Location(85, 130),   # 5: Northwest
-                Location(70, 100),   # 6: West point
-                Location(85, 70),    # 7: Southwest
-                Location(115, 50),   # 8: South-southwest
-                Location(150, 40),   # 9: South point
-                Location(185, 50),   # 10: South-southeast
-                Location(215, 70),   # 11: Southeast
+                Location(250, 100),  # 0: East point (START) - shifted east to avoid excavation
+                Location(240, 140),  # 1: Northeast - shifted east
+                Location(185, 165),  # 2: North-northeast
+                Location(150, 175),  # 3: North point
+                Location(115, 165),  # 4: North-northwest
+                Location(60, 140),   # 5: Northwest - shifted west to avoid crane zone
+                Location(40, 100),   # 6: West point - shifted west
+                Location(60, 60),    # 7: Southwest - shifted to avoid crane zone
+                Location(115, 20),   # 8: South-southwest - shifted south
+                Location(150, 10),   # 9: South point
+                Location(185, 20),   # 10: South-southeast
+                Location(240, 60),   # 11: Southeast - shifted east to avoid excavation
             ]
             self.path_index = 0
             # Start truck at first waypoint
