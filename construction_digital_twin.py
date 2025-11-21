@@ -320,13 +320,43 @@ class ConstructionEquipment:
         """Update equipment position based on movement patterns"""
         if not self.is_active or not self.is_moving:
             return
-            
+
+        # Emergency evacuation takes priority
+        if hasattr(self, 'is_evacuating') and self.is_evacuating:
+            self.move_to_evacuation_point()
+            return
+
         if self.type == EquipmentType.CONCRETE_MIXER and self.movement_path:
             # Follow predefined path for trucks
             self.follow_path()
         else:
             # Simple random movement for other equipment
             self.random_movement()
+
+    def move_to_evacuation_point(self):
+        """Move toward evacuation assembly point"""
+        if not hasattr(self, 'evacuation_target'):
+            return
+
+        target = self.evacuation_target
+        dx = target.x - self.location.x
+        dy = target.y - self.location.y
+        distance = (dx**2 + dy**2)**0.5
+
+        if distance < 3.0:  # Reached assembly point
+            self.is_moving = False
+            return
+
+        # Move faster during evacuation
+        speed = self.movement_speed * 2.0
+        move_x = (dx / distance) * speed
+        move_y = (dy / distance) * speed
+        self.location.x += move_x
+        self.location.y += move_y
+
+        # Update rotation angle
+        import math
+        self.rotation_angle = math.atan2(dy, dx) * 180 / math.pi
             
     def follow_path(self):
         """Follow predefined waypoint path"""
@@ -552,6 +582,22 @@ class EnvironmentalMonitor:
         self.air_quality = 85.0
         self.noise_level = 60.0
         self.dust_level = 20.0
+        self.emergency_active = False
+        self.emergency_type = None
+
+    def trigger_emergency(self, emergency_type: str, dust_level: float = 90.0):
+        """Trigger emergency condition"""
+        self.emergency_active = True
+        self.emergency_type = emergency_type
+        self.dust_level = dust_level
+        print(f"🚨 EMERGENCY: {emergency_type} - Dust level: {dust_level}%")
+
+    def clear_emergency(self):
+        """Clear emergency condition"""
+        self.emergency_active = False
+        self.emergency_type = None
+        self.dust_level = 20.0
+        print("✅ Emergency cleared")
         
     def update_conditions(self):
         # Simulate changing environmental conditions
@@ -578,6 +624,8 @@ class EnvironmentalMonitor:
             "air_quality": round(self.air_quality, 1),
             "noise_level": round(self.noise_level, 1),
             "dust_level": round(self.dust_level, 1),
+            "emergency_active": self.emergency_active,
+            "emergency_type": self.emergency_type,
             "timestamp": datetime.now()
         }
 
@@ -595,6 +643,14 @@ class ConstructionSiteDigitalTwin:
         # Telemetry collection thread (10ms interval)
         self.telemetry_thread = None
         self.telemetry_running = False
+
+        # Safe assembly points for emergency evacuation
+        self.assembly_points = [
+            {"name": "Assembly Point A", "location": Location(20, 20), "capacity": 20},
+            {"name": "Assembly Point B", "location": Location(280, 20), "capacity": 20},
+            {"name": "Assembly Point C", "location": Location(20, 180), "capacity": 20},
+            {"name": "Assembly Point D", "location": Location(280, 180), "capacity": 20},
+        ]
 
         # Initialize with sample equipment
         self.add_equipment("EXC001", EquipmentType.EXCAVATOR, Location(50, 25))
@@ -620,7 +676,61 @@ class ConstructionSiteDigitalTwin:
         
         for worker in workers:
             self.safety_monitor.add_worker(worker)
-            
+
+    def find_nearest_assembly_point(self, location: Location) -> dict:
+        """Find the nearest assembly point to a given location"""
+        nearest = None
+        min_distance = float('inf')
+        for point in self.assembly_points:
+            dx = point["location"].x - location.x
+            dy = point["location"].y - location.y
+            distance = (dx**2 + dy**2)**0.5
+            if distance < min_distance:
+                min_distance = distance
+                nearest = point
+        return nearest
+
+    def trigger_emergency_evacuation(self, dust_level: float = 90.0):
+        """Trigger emergency evacuation - all entities move to nearest assembly point"""
+        self.environmental_monitor.trigger_emergency("HIGH_DUST_LEVEL", dust_level)
+
+        # Set evacuation targets for all equipment
+        for equipment in self.equipment.values():
+            nearest = self.find_nearest_assembly_point(equipment.location)
+            equipment.evacuation_target = nearest["location"]
+            equipment.is_evacuating = True
+            equipment.is_moving = True
+            # Clear normal path following
+            equipment.movement_path = []
+            print(f"🚨 {equipment.id} evacuating to {nearest['name']}")
+
+        # Set evacuation targets for all workers
+        for worker in self.safety_monitor.workers.values():
+            nearest = self.find_nearest_assembly_point(worker.location)
+            worker.evacuation_target = nearest["location"]
+            worker.is_evacuating = True
+            print(f"🚨 Worker {worker.name} evacuating to {nearest['name']}")
+
+    def clear_emergency(self):
+        """Clear emergency and resume normal operations"""
+        self.environmental_monitor.clear_emergency()
+
+        # Reset equipment evacuation state
+        for equipment in self.equipment.values():
+            equipment.is_evacuating = False
+            if hasattr(equipment, 'evacuation_target'):
+                delattr(equipment, 'evacuation_target')
+            # Restore truck routes
+            if equipment.type == EquipmentType.CONCRETE_MIXER:
+                equipment.setup_truck_routes()
+                equipment.is_moving = True
+
+        # Reset worker evacuation state
+        for worker in self.safety_monitor.workers.values():
+            worker.is_evacuating = False
+            if hasattr(worker, 'evacuation_target'):
+                delattr(worker, 'evacuation_target')
+
     def start_operations(self):
         self.is_running = True
         for equipment in self.equipment.values():
@@ -688,9 +798,23 @@ class ConstructionSiteDigitalTwin:
         
         # Simulate worker movements and status updates
         for worker_id, worker in self.safety_monitor.workers.items():
-            # Simulate movement
-            worker.location.x += random.uniform(-5, 5)
-            worker.location.y += random.uniform(-5, 5)
+            # Check if evacuating
+            if hasattr(worker, 'is_evacuating') and worker.is_evacuating:
+                # Move toward evacuation target
+                if hasattr(worker, 'evacuation_target'):
+                    target = worker.evacuation_target
+                    dx = target.x - worker.location.x
+                    dy = target.y - worker.location.y
+                    distance = (dx**2 + dy**2)**0.5
+                    if distance > 3.0:
+                        # Move faster during evacuation (running)
+                        speed = 8.0
+                        worker.location.x += (dx / distance) * speed
+                        worker.location.y += (dy / distance) * speed
+            else:
+                # Normal random movement
+                worker.location.x += random.uniform(-5, 5)
+                worker.location.y += random.uniform(-5, 5)
             worker.location.x = max(0, min(300, worker.location.x))
             worker.location.y = max(0, min(200, worker.location.y))
             
@@ -743,6 +867,10 @@ class ConstructionSiteDigitalTwin:
                 "milestones": self.progress_tracker.milestones[-5:]  # Last 5 milestones
             },
             "environment": self.environmental_monitor.get_status(),
+            "assembly_points": [
+                {"name": p["name"], "location": {"x": p["location"].x, "y": p["location"].y}, "capacity": p["capacity"]}
+                for p in self.assembly_points
+            ],
             "timestamp": datetime.now()
         }
         
@@ -810,6 +938,27 @@ def start_operations():
 def stop_operations():
     construction_site.stop_operations()
     return jsonify({"status": "stopped"})
+
+@app.route('/api/trigger-emergency', methods=['POST'])
+def trigger_emergency():
+    """Trigger emergency evacuation (e.g., high dust level)"""
+    data = request.get_json() or {}
+    dust_level = data.get('dust_level', 90.0)
+    construction_site.trigger_emergency_evacuation(dust_level)
+    return jsonify({
+        "status": "emergency_triggered",
+        "dust_level": dust_level,
+        "assembly_points": [
+            {"name": p["name"], "location": {"x": p["location"].x, "y": p["location"].y}}
+            for p in construction_site.assembly_points
+        ]
+    })
+
+@app.route('/api/clear-emergency', methods=['POST'])
+def clear_emergency():
+    """Clear emergency and resume normal operations"""
+    construction_site.clear_emergency()
+    return jsonify({"status": "emergency_cleared"})
 
 @app.route('/api/telemetry/equipment')
 def get_equipment_telemetry():
