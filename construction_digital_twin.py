@@ -293,20 +293,26 @@ class ConstructionEquipment:
         print(f"🛑 Stopped {self.type.value}: {self.id}")
         
     def setup_truck_routes(self):
-        """Setup predefined routes for concrete mixer trucks"""
+        """Setup predefined routes for concrete mixer trucks from JSON file"""
         if self.type == EquipmentType.CONCRETE_MIXER:
-            # Straight line loop: Y from 0 to 300 at X=150, step of 10
             self.movement_path = []
-            # Forward: Y 0 to 300
-            for y in range(0, 310, 10):
-                self.movement_path.append(Location(150, y))
-            # Backward: Y 290 to 10 (exclude endpoints to avoid duplicates)
-            for y in range(290, 0, -10):
-                self.movement_path.append(Location(150, y))
+            try:
+                with open('truck_route.json', 'r') as f:
+                    route_data = json.load(f)
+                    for point in route_data.get('route', []):
+                        self.movement_path.append(Location(point[0], point[1]))
+            except FileNotFoundError:
+                # Fallback: simple back-and-forth route
+                for y in range(0, 210, 10):
+                    self.movement_path.append(Location(150, y))
+                for y in range(190, 0, -10):
+                    self.movement_path.append(Location(150, y))
+
             self.path_index = 0
             # Start truck at first waypoint
-            self.location = Location(self.movement_path[0].x, self.movement_path[0].y)
-            self.target_location = self.movement_path[0]
+            if self.movement_path:
+                self.location = Location(self.movement_path[0].x, self.movement_path[0].y)
+                self.target_location = self.movement_path[0]
             
     def update_movement(self):
         """Update equipment position based on movement patterns"""
