@@ -2069,11 +2069,13 @@
                     point.y - 200   // Convert to scene coordinates
                 ));
             });
-            
-            // Create a smooth curve through the points
-            const curve = new THREE.CatmullRomCurve3(pathPoints, true); // true for closed loop
-            const points = curve.getPoints(50);
-            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            // Close the loop by adding first point at end
+            if (pathPoints.length > 0) {
+                pathPoints.push(pathPoints[0].clone());
+            }
+
+            // Create straight line path (matches actual truck movement)
+            const geometry = new THREE.BufferGeometry().setFromPoints(pathPoints);
             
             const material = new THREE.LineBasicMaterial({ 
                 color: 0x00d4ff,

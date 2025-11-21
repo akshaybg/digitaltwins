@@ -276,7 +276,7 @@ class ConstructionEquipment:
         
         # Set default movement parameters based on equipment type
         if equipment_type == EquipmentType.CONCRETE_MIXER:
-            self.movement_speed = 2.0  # Slower, realistic truck speed
+            self.movement_speed = 1.0  # Smooth movement at 10ms updates
             self.setup_truck_routes()
         elif equipment_type == EquipmentType.EXCAVATOR:
             self.movement_speed = 1.0  # Slow movement for excavators
@@ -295,21 +295,26 @@ class ConstructionEquipment:
     def setup_truck_routes(self):
         """Setup predefined routes for concrete mixer trucks"""
         if self.type == EquipmentType.CONCRETE_MIXER:
-            # Define a realistic truck route: entrance -> loading -> construction sites -> exit
+            # Define a smooth oval loop route (clockwise)
+            # Center around (150, 100), radius ~80x60
             self.movement_path = [
-                Location(250, 190),  # Site entrance
-                Location(200, 160),  # Approach road
-                Location(150, 130),  # Concrete plant/loading area
-                Location(100, 100),  # Construction site A
-                Location(70, 80),    # Pour location 1
-                Location(90, 60),    # Pour location 2
-                Location(120, 40),   # Construction site B
-                Location(180, 70),   # Exit route
-                Location(230, 120),  # Access road
-                Location(280, 180),  # Site exit
+                Location(230, 100),  # 0: East point (START)
+                Location(215, 130),  # 1: Northeast
+                Location(185, 150),  # 2: North-northeast
+                Location(150, 160),  # 3: North point
+                Location(115, 150),  # 4: North-northwest
+                Location(85, 130),   # 5: Northwest
+                Location(70, 100),   # 6: West point
+                Location(85, 70),    # 7: Southwest
+                Location(115, 50),   # 8: South-southwest
+                Location(150, 40),   # 9: South point
+                Location(185, 50),   # 10: South-southeast
+                Location(215, 70),   # 11: Southeast
             ]
             self.path_index = 0
-            self.target_location = self.movement_path[0] if self.movement_path else self.location
+            # Start truck at first waypoint
+            self.location = Location(self.movement_path[0].x, self.movement_path[0].y)
+            self.target_location = self.movement_path[0]
             
     def update_movement(self):
         """Update equipment position based on movement patterns"""
@@ -399,12 +404,9 @@ class ConstructionEquipment:
         self.telemetry_history.append(telemetry)
         if len(self.telemetry_history) > 100:
             self.telemetry_history.pop(0)
-            
+
         # Check for alerts
         self.check_alerts()
-        
-        # Update movement if active
-        self.update_movement()
         
     def check_alerts(self):
         self.alerts.clear()
@@ -419,6 +421,14 @@ class ConstructionEquipment:
             self.alerts.append("OVERLOAD")
             
     def get_status(self):
+        # Waypoint names for event injection reference (12 points on oval)
+        waypoint_names = [
+            "East point", "Northeast", "North-northeast", "North point",
+            "North-northwest", "Northwest", "West point", "Southwest",
+            "South-southwest", "South point", "South-southeast", "Southeast"
+        ]
+        current_waypoint_name = waypoint_names[self.path_index] if self.movement_path and self.path_index < len(waypoint_names) else "N/A"
+
         return {
             "id": self.id,
             "type": self.type.value,
@@ -436,6 +446,8 @@ class ConstructionEquipment:
             "movement_speed": self.movement_speed,
             "rotation_angle": self.rotation_angle,
             "target_location": asdict(self.target_location) if hasattr(self, 'target_location') else None,
+            "path_index": self.path_index,
+            "current_waypoint": current_waypoint_name,
             "path_progress": f"{self.path_index + 1}/{len(self.movement_path)}" if hasattr(self, 'movement_path') and self.movement_path else "N/A",
             "movement_path": [asdict(p) for p in self.movement_path] if hasattr(self, 'movement_path') and self.movement_path else []
         }
@@ -645,9 +657,10 @@ class ConstructionSiteDigitalTwin:
         """High-frequency telemetry collection loop (10ms)"""
         while self.telemetry_running:
             try:
-                # Collect equipment telemetry
+                # Update equipment movement at 10ms for smooth motion
                 for equipment in self.equipment.values():
                     if equipment.is_active:
+                        equipment.update_movement()
                         self.telemetry_db.insert_equipment_telemetry(equipment)
 
                 # Collect worker telemetry
@@ -825,7 +838,7 @@ def background_updates():
     """Background thread to continuously update the system"""
     while True:
         construction_site.update_system()
-        time.sleep(2)
+        time.sleep(0.1)  # Update every 100ms for smoother movement
 
 if __name__ == "__main__":
     print("🏗️  Construction Site Digital Twin")
