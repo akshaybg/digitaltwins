@@ -1,165 +1,102 @@
-# 🏗️ Construction Site Digital Twin - 3D Visualization
+# Construction Site Digital Twin
 
-A real-time 3D digital twin system for monitoring construction sites, equipment, workers, and environmental conditions.
+An interactive 3D visualization and simulation of a construction site with equipment tracking, worker safety, environmental monitoring, emergency evacuation, and high-frequency telemetry storage.
 
-## 🚀 Quick Start
+## Quick Start
 
-### Run the Demo (One Command!)
+### Prerequisites
+- Python 3.10+
+- Windows PowerShell
 
-**Linux/Mac:**
-```bash
-./run_demo.sh
-```
-
-**Windows:**
-```bash
-run_demo.bat
-```
-
-**Access the visualization:**
-- Open your browser to: **http://localhost:8001/**
-
-That's it! The 3D construction site will load immediately.
-
----
-
-## 📋 Requirements
-
-- Python 3.8+
-- Flask and dependencies (auto-installed by run script)
-- Modern web browser with WebGL support
-
----
-
-## 🎮 Features
-
-### Real-Time 3D Visualization
-- Interactive 3D construction site environment
-- Equipment models (excavators, cranes, concrete mixers, bulldozers)
-- Worker position tracking with 3D characters
-- Safety zone visualization
-- Dynamic camera controls
-
-### Equipment Monitoring
-- Real-time telemetry (fuel, temperature, vibration, load)
-- Automated route following (concrete mixer trucks)
-- Operating hours tracking
-- Alert system (low fuel, high temperature, overload)
-
-### Worker Safety
-- PPE compliance monitoring (helmets, vests)
-- Health metrics (heart rate, body temperature)
-- Restricted zone violation detection
-- Real-time position tracking
-
-### Environmental Monitoring
-- Temperature, humidity, wind speed
-- Air quality index
-- Noise level monitoring
-- Dust level tracking
-
----
-
-## 📁 Project Structure
-
-```
-digitaltwins/
-├── construction_digital_twin.py   # Main application
-├── templates/
-│   └── construction_3d_dashboard.html  # 3D visualization UI
-├── run_demo.sh                    # Linux/Mac launcher
-├── run_demo.bat                   # Windows launcher
-├── requirements.txt               # Python dependencies
-├── DEMO_GUIDE.md                  # Detailed demo guide
-└── README.md                      # This file
-```
-
----
-
-## 🎬 Demo Tips
-
-1. **Start operations** - Click "Start Operations" to see equipment move
-2. **Zoom in** - Use mouse wheel to zoom into specific equipment
-3. **Rotate view** - Click and drag to rotate the camera
-4. **Equipment details** - Click on equipment to see telemetry
-5. **Watch the mixer** - The concrete truck follows a realistic route!
-
----
-
-## 🛑 Stop the Demo
-
-Press `Ctrl+C` in the terminal
-
-Or:
-```bash
-pkill -f construction_digital_twin.py
-```
-
----
-
-## 🔧 Manual Setup (Advanced)
-
-If you want to set up manually:
-
-```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate.bat  # Windows
-
-# Install dependencies
+### Setup
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-
-# Run the application
-python3 construction_digital_twin.py
 ```
 
----
+### Run
+```powershell
+python construction_digital_twin.py
+```
+Open http://localhost:8001 in your browser.
 
-## 🎓 For Presentations
+## Deployment (Free Options)
 
-See **DEMO_GUIDE.md** for:
-- Detailed demo flow (3-5 minute presentation)
-- Talking points for professors
-- Technical architecture overview
-- Troubleshooting tips
+### Render (Recommended)
+1. Push this folder to a public GitHub repo.
+2. Create a new Web Service on Render; choose Docker and the repo.
+3. Render detects `render.yaml` and builds automatically.
+4. After deploy, open the generated Render URL (e.g. `https://construction-digital-twin.onrender.com`).
+5. Health check at `/health` keeps service green. Default `AUTO_START=1` starts operations.
 
----
+### Railway
+1. Create a Railway project, link your GitHub repo.
+2. Add a service from the repo; Railway auto-builds Docker.
+3. Set env vars if needed: `PORT=8001`, `AUTO_START=1`.
+4. Access the public domain Railway provides.
 
-## 🌐 Technology Stack
+### Fly.io
+1. Install Fly CLI: `fly launch` (select Python or Docker, use existing Dockerfile).
+2. Set `fly.toml` `PORT` to 8001 or rely on env.
+3. Deploy: `fly deploy`.
+4. App reachable at `https://<app>.fly.dev`.
 
-- **Backend:** Python + Flask
-- **Frontend:** Three.js (3D rendering)
-- **Real-time Updates:** Background threading (2-second intervals)
-- **Architecture:** Digital Twin pattern with in-memory state
+### Cloudflare Tunnel (Expose Local Dev)
+1. Install `cloudflared`.
+2. Run: `cloudflared tunnel --url http://localhost:8001`.
+3. Share the temporary public URL (not persistent; good for demos).
 
----
+### PythonAnywhere (Free tier)
+1. Upload project files.
+2. Create a new web app (manual config, Flask).
+3. WSGI entrypoint: `from construction_digital_twin import app as application`.
+4. Set working directory and reload.
 
-## 📊 What is a Digital Twin?
+### Replit / Codespaces
+Run `python construction_digital_twin.py`; platform provides a public URL. Performance may be lower for 10ms telemetry.
 
-A digital twin is a virtual representation of physical assets that mirrors their real-world state in real-time. This project simulates:
-- Physical equipment → Virtual 3D models
-- Sensor data → Telemetry updates
-- Worker positions → Safety monitoring
-- Environmental conditions → Decision support
+## Production Notes
+- The `Dockerfile` uses Gunicorn with workers/threads for concurrency.
+- `AUTO_START=1` starts operations on container boot; set to `0` to start manually.
+- SQLite writes at 10ms may be heavy on free tiers; increase interval if platform throttles CPU.
+- Consider adding authentication before exposing control endpoints publicly.
+- Unused dependencies (FastAPI, pydantic, uvicorn, python-json-logger) can be removed if not used.
 
----
+## Environment Variables
+- `PORT`: Port the server binds to (platform may override).
+- `AUTO_START`: `1` auto-starts operations; `0` disables.
 
-## 🤝 Contributing
+## Docker Local Run
+```powershell
+docker build -t construction-twin .
+docker run -p 8001:8001 -e AUTO_START=1 construction-twin
+```
+Open http://localhost:8001
 
-This is a college project for demonstration purposes. Feel free to:
-- Add more equipment types
-- Implement new safety rules
-- Enhance 3D visualizations
-- Add new telemetry sensors
+## Core Endpoints
+- `GET /` – 3D dashboard page
+- `GET /api/dashboard-data` – Full site snapshot
+- `POST /api/start-operations` – Start equipment + telemetry
+- `POST /api/stop-operations` – Stop equipment + telemetry
+- `POST /api/trigger-emergency` – Trigger evacuation (optional `dust_level`)
+- `POST /api/clear-emergency` – Clear evacuation
+- `POST /api/truck/kill` – Freeze concrete mixer (`equipment_id` optional)
+- `POST /api/truck/resume` – Resume concrete mixer (`equipment_id` optional)
+- `GET /health` – Health check status
+- `POST /api/route/select` – Switch truck route file
 
----
+### Route Switching
+Switch the concrete mixer route at runtime:
+```powershell
+$body = @{ route_file = "truck_route_wrong_route.json"; equipment_id = "MIX001" } | ConvertTo-Json
+curl -Method POST -ContentType 'application/json' -Body $body http://localhost:8001/api/route/select
+```
 
-## 📝 License
+## Notes
+- Telemetry collection runs at 10ms and writes to `construction_telemetry.db`.
+- `truck_route.json` is the default route; you can switch to `truck_route_correct.json` or `truck_route_wrong_route.json` via the API.
+- If performance is constrained, consider increasing telemetry interval or batching DB inserts.
 
-Educational/Demo Project - Free to use and modify
-
----
-
-**Built for construction site monitoring and safety management** 🏗️✨
+## License
+Internal project. Use responsibly.

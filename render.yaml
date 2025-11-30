@@ -1,0 +1,12 @@
+# Render service definition for Construction Digital Twin
+# Docs: https://render.com/docs/infrastructure-as-code
+services:
+  - type: web
+    name: construction-digital-twin
+    env: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /health
+    buildCommand: ''
+    startCommand: ''
+    # Uses Dockerfile at repo root

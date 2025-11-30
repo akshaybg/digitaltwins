@@ -16,6 +16,7 @@ from enum import Enum
 import threading
 from flask import Flask, render_template, jsonify, request
 import uuid
+import os
 
 class EquipmentType(Enum):
     EXCAVATOR = "excavator"
@@ -297,7 +298,8 @@ class ConstructionEquipment:
         if self.type == EquipmentType.CONCRETE_MIXER:
             self.movement_path = []
             try:
-                with open('truck_route.json', 'r') as f:
+                route_file = getattr(self, 'route_file', 'truck_route.json')
+                with open(route_file, 'r') as f:
                     route_data = json.load(f)
                     for point in route_data.get('route', []):
                         self.movement_path.append(Location(point[0], point[1]))
@@ -934,6 +936,17 @@ def index():
 def api_dashboard_data():
     return jsonify(construction_site.get_dashboard_data())
 
+@app.route('/health')
+def health():
+    """Simple health check endpoint"""
+    return jsonify({
+        "status": "ok",
+        "app_running": construction_site.is_running,
+        "telemetry_running": construction_site.telemetry_running,
+        "equipment_count": len(construction_site.equipment),
+        "worker_count": len(construction_site.safety_monitor.workers)
+    })
+
 @app.route('/api/start-operations', methods=['POST'])
 def start_operations():
     construction_site.start_operations()
@@ -964,6 +977,42 @@ def clear_emergency():
     """Clear emergency and resume normal operations"""
     construction_site.clear_emergency()
     return jsonify({"status": "emergency_cleared"})
+
+@app.route('/api/route/select', methods=['POST'])
+def select_route():
+    """Select a route file for the concrete mixer truck at runtime.
+    Body: {"route_file": "truck_route_wrong_route.json", "equipment_id": "MIX001"}
+    """
+    data = request.get_json(silent=True) or {}
+    equipment_id = data.get('equipment_id', 'MIX001')
+    route_file = data.get('route_file')
+
+    if not route_file:
+        return jsonify({"status": "error", "message": "route_file required"}), 400
+
+    if not os.path.isabs(route_file):
+        route_file_path = route_file
+    else:
+        route_file_path = route_file
+
+    if not os.path.exists(route_file_path):
+        return jsonify({"status": "error", "message": f"Route file not found: {route_file_path}"}), 404
+
+    eq = construction_site.equipment.get(equipment_id)
+    if not eq or eq.type != EquipmentType.CONCRETE_MIXER:
+        return jsonify({"status": "error", "message": "Concrete mixer equipment not found"}), 404
+
+    # Apply new route
+    eq.route_file = route_file_path
+    eq.setup_truck_routes()
+    eq.is_moving = not getattr(eq, 'kill_switch', False)
+
+    return jsonify({
+        "status": "route_applied",
+        "equipment_id": equipment_id,
+        "route_file": route_file_path,
+        "waypoints": len(eq.movement_path)
+    })
 
 @app.route('/api/truck/kill', methods=['POST'])
 def truck_kill():
@@ -1030,13 +1079,22 @@ def background_updates():
 if __name__ == "__main__":
     print("🏗️  Construction Site Digital Twin")
     print("=====================================")
-    
+
     # Start background updates
     update_thread = threading.Thread(target=background_updates, daemon=True)
     update_thread.start()
-    
-    # Start Flask development server
-    print("\n🌐 Starting 3D Construction Site Visualization at http://localhost:8001")
+
+    # Optional auto-start operations via env var
+    if os.environ.get("AUTO_START", "0") == "1":
+        try:
+            construction_site.start_operations()
+            print("✅ AUTO_START enabled: operations started")
+        except Exception as e:
+            print(f"AUTO_START failed: {e}")
+
+    # Determine port from environment
+    port = int(os.environ.get("PORT", "8001"))
+    print(f"\n🌐 Starting 3D Construction Site Visualization at http://localhost:{port}")
     print("   Open your browser and watch the site in real-time 3D!")
 
-    app.run(host='0.0.0.0', port=8001, debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)

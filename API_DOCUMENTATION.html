@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Construction Digital Twin - API Documentation</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success: #16a34a;
+            --warning: #ea580c;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --code-bg: #1e293b;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+        header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        header p { opacity: 0.9; font-size: 1.1rem; }
+        nav {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        nav ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: center; }
+        nav a { color: var(--primary); text-decoration: none; font-weight: 500; }
+        nav a:hover { text-decoration: underline; }
+        section { margin: 2rem 0; }
+        h2 {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        h3 { margin: 1.5rem 0 1rem; color: var(--text); }
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .endpoint {
+            border-left: 4px solid var(--primary);
+            padding-left: 1rem;
+            margin-bottom: 2rem;
+        }
+        .endpoint.get { border-color: var(--success); }
+        .endpoint.post { border-color: var(--primary); }
+        .method {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.875rem;
+            margin-right: 0.5rem;
+        }
+        .method.get { background: #dcfce7; color: var(--success); }
+        .method.post { background: #dbeafe; color: var(--primary); }
+        .path {
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 1rem;
+            color: var(--text);
+        }
+        .description { color: var(--text-muted); margin: 0.75rem 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        th { background: var(--bg); font-weight: 600; }
+        pre {
+            background: var(--code-bg);
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        code {
+            font-family: 'Monaco', 'Consolas', monospace;
+        }
+        .inline-code {
+            background: #f1f5f9;
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .badge-optional { background: #fef3c7; color: #92400e; }
+        .badge-required { background: #fee2e2; color: var(--danger); }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+        .feature {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+        }
+        .feature h4 { color: var(--primary); margin-bottom: 0.5rem; }
+        .curl-section { margin-top: 1rem; }
+        .curl-section summary {
+            cursor: pointer;
+            color: var(--primary);
+            font-weight: 500;
+            padding: 0.5rem 0;
+        }
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            margin-top: 3rem;
+        }
+        .toc { column-count: 2; column-gap: 2rem; }
+        @media (max-width: 768px) {
+            .toc { column-count: 1; }
+            header h1 { font-size: 1.75rem; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Construction Digital Twin</h1>
+        <p>Real-time 3D Monitoring & Visualization API Documentation</p>
+    </header>
+
+    <nav>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#quickstart">Quick Start</a></li>
+            <li><a href="#core-api">Core API</a></li>
+            <li><a href="#emergency-api">Emergency</a></li>
+            <li><a href="#truck-api">Truck Control</a></li>
+            <li><a href="#telemetry-api">Telemetry</a></li>
+            <li><a href="#data-models">Data Models</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <!-- Overview Section -->
+        <section id="overview">
+            <h2>Overview</h2>
+            <div class="card">
+                <p>The <strong>Construction Site Digital Twin</strong> is a comprehensive real-time monitoring and visualization system for construction sites. It provides:</p>
+                <div class="feature-grid" style="margin-top: 1.5rem;">
+                    <div class="feature">
+                        <h4>3D Visualization</h4>
+                        <p>Interactive Three.js-based 3D construction site view with real-time updates.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Equipment Tracking</h4>
+                        <p>Monitor excavators, cranes, concrete mixers, and bulldozers with telemetry data.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Worker Safety</h4>
+                        <p>Track worker locations, health metrics (heart rate, temperature), and PPE compliance.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Emergency Response</h4>
+                        <p>Trigger evacuations and guide workers to assembly points.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Environmental Monitoring</h4>
+                        <p>Real-time temperature, humidity, air quality, noise, and dust levels.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>High-Frequency Telemetry</h4>
+                        <p>10ms interval data collection stored in SQLite for analysis.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Start -->
+        <section id="quickstart">
+            <h2>Quick Start</h2>
+            <div class="card">
+                <h3>Installation</h3>
+                <pre><code># Install dependencies
+pip install -r requirements.txt
+
+# Start the server
+python construction_digital_twin.py
+
+# Access the dashboard
+# Open http://localhost:8001 in your browser</code></pre>
+
+                <h3>Base URL</h3>
+                <pre><code>http://localhost:8001</code></pre>
+
+                <h3>Quick Test</h3>
+                <pre><code># Get dashboard data
+curl http://localhost:8001/api/dashboard-data
+
+# Start operations
+curl -X POST http://localhost:8001/api/start-operations
+
+# Stop operations
+curl -X POST http://localhost:8001/api/stop-operations</code></pre>
+            </div>
+        </section>
+
+        <!-- Core API -->
+        <section id="core-api">
+            <h2>Core API Endpoints</h2>
+
+            <div class="endpoint get">
+                <span class="method get">GET</span>
+                <span class="path">/</span>
+                <p class="description">Serves the main 3D visualization dashboard HTML page.</p>
+                <details class="curl-section">
+                    <summary>cURL Example</summary>
+                    <pre><code>curl http://localhost:8001/</code></pre>
+                </details>
+            </div>
+
+            <div class="endpoint get">
+                <span class="method get">GET</span>
+                <span class="path">/api/dashboard-data</span>
+                <p class="description">Returns complete site data including equipment, workers, safety status, project progress, environment, and assembly points.</p>
+                <details class="curl-section">
+                    <summary>cURL Example</summary>
+                    <pre><code>curl http://localhost:8001/api/dashboard-data</code></pre>
+                </details>
+                <details class="curl-section">
+                    <summary>Response Example</summary>
+                    <pre><code>{
+  "site_info": {
+    "name": "Metro Construction Project - Phase 1",
+    "start_time": "2025-11-21T10:30:00",
+    "is_running": true,
+    "uptime": "0:15:30.123456"
+  },
+  "equipment": {
+    "EXC001": {
+      "id": "EXC001",
+      "type": "excavator",
+      "location": {"x": 50, "y": 25, "z": 0},
+      "is_active": true,
+      "engine_temp": 45.2,
+      "fuel_level": 92.5,
+      "vibration_level": 25.3,
+      "load_weight": 8500,
+      "kill_switch": false
+    }
+  },
+  "workers": {
+    "W001": {
+      "id": "W001",
+      "name": "Muniraju",
+      "location": {"x": 60, "y": 30, "z": 0},
+      "heart_rate": 75,
+      "body_temp": 36.5,
+      "has_helmet": true,
+      "has_vest": true
+    }
+  },
+  "environment": {
+    "temperature": 22.5,
+    "humidity": 55.3,
+    "wind_speed": 8.2,
+    "air_quality": 82.1,
+    "noise_level": 75.5,
+    "dust_level": 25.3,
+    "emergency_active": false
+  },
+  "assembly_points": [...]
+}</code></pre>
+                </details>
+            </div>
+
+            <div class="endpoint post">
+                <span class="method post">POST</span>
+                <span class="path">/api/start-operations</span>
+                <p class="description">Start all equipment and operations. Activates telemetry collection and equipment movement.</p>
+                <details class="curl-section">
+                    <summary>cURL Example</summary>
+                    <pre><code>curl -X POST http://localhost:8001/api/start-operations</code></pre>
+                </details>
+                <details class="curl-section">
+                    <summary>Response</summary>
+                    <pre><code>{"status": "started"}</code></pre>
+                </details>
+            </div>
+
+            <div class="endpoint post">
+                <span class="method post">POST</span>
+                <span class="path">/api/stop-operations</span>
+                <p class="description">Stop all equipment and operations. Halts telemetry collection.</p>
+                <details class="curl-section">
+                    <summary>cURL Example</summary>
+                    <pre><code>curl -X POST http://localhost:8001/api/stop-operations</code></pre>
+                </details>
+                <details class="curl-section">
+                    <summary>Response</summary>
+                    <pre><code>{"status": "stopped"}</code></pre>
+                </details>
+            </div>
+        </section>
+
+        <!-- Emergency API -->
+        <section id="emergency-api">
+            <h2>Emergency Management API</h2>
+
+            <div class="endpoint post">
+                <span class="method post">POST</span>
+                <span class="path">/api/trigger-emergency</span>
+                <p class="description">Trigger emergency evacuation. All equipment stops and workers are directed to nearest assembly points.</p>
+
+                <h4>Parameters</h4>
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">dust_level</code></td>
+                        <td>float</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                        <td>90.0</td>
+                        <td>Dust level that triggered the emergency</td>
+                    </tr>
+                </table>
+
+                <details class="curl-section">
+                    <summary>cURL Examples</summary>
+                    <pre><code># Trigger with default dust level
+curl -X POST http://localhost:8001/api/trigger-emergency
+
+# Trigger with custom dust level
+curl -X POST http://localhost:8001/api/trigger-emergency \
+  -H "Content-Type: application/json" \
+  -d '{"dust_level": 95.0}'</code></pre>
+                </details>
+                <details class="curl-section">
+                    <summary>Response Example</summary>
+                    <pre><code>{
+  "status": "emergency_triggered",
+  "dust_level": 95.0,
+  "assembly_points": [
+    {"name": "Assembly Point A", "location": {"x": 20, "y": 20}},
+    {"name": "Assembly Point B", "location": {"x": 280, "y": 20}},
+    {"name": "Assembly Point C", "location": {"x": 20, "y": 180}},
+    {"name": "Assembly Point D", "location": {"x": 280, "y": 180}}
+  ]
+}</code></pre>
+                </details>
+            </div>
+
+            <div class="endpoint post">
+                <span class="method post">POST</span>
+                <span class="path">/api/clear-emergency</span>
+                <p class="description">Clear emergency state and resume normal operations.</p>
+                <details class="curl-section">
+                    <summary>cURL Example</summary>
+                    <pre><code>curl -X POST http://localhost:8001/api/clear-emergency</code></pre>
+                </details>
+                <details class="curl-section">
+                    <summary>Response</summary>
+                    <pre><code>{"status": "emergency_cleared"}</code></pre>
+                </details>
+            </div>
+        </section>
+
+        <!-- Truck Control API -->
+        <section id="truck-api">
+            <h2>Truck Control API (Kill Switch)</h2>
+
+            <div class="endpoint post">
+                <span class="method post">POST</span>
+                <span class="path">/api/truck/kill</span>
+                <p class="description">Freeze a truck at its current location. The truck will stop moving until resumed. Visual feedback shows red/orange pulsing on the frozen truck.</p>
+
+                <h4>Parameters</h4>
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">equipment_id</code></td>
+                        <td>string</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                        <td>MIX001</td>
+                        <td>Equipment ID of the truck to freeze</td>
+                    </tr>
+                </table>
+
+                <details class="curl-section">
+                    <summary>cURL Examples</summary>
+                    <pre><code># Kill default truck (MIX001) - No Content-Type needed
+curl -X POST http://localhost:8001/api/truck/kill
+
+# Kill specific truck with JSON body
+curl -X POST http://localhost:8001/api/truck/kill \
+  -H "Content-Type: application/json" \
+  -d '{"equipment_id": "MIX001"}'</code></pre>
+                </details>
+                <details class="curl-section">
+                    <summary>Response Example</summary>
+                    <pre><code>{
+  "status": "truck_frozen",
+  "equipment_id": "MIX001",
+  "location": {"x": 150.5, "y": 75.2}
+}</code></pre>
+                </details>
+            </div>
+
+            <div class="endpoint post">
+                <span class="method post">POST</span>
+                <span class="path">/api/truck/resume</span>
+                <p class="description">Resume truck movement after kill switch activation.</p>
+
+                <h4>Parameters</h4>
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">equipment_id</code></td>
+                        <td>string</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                        <td>MIX001</td>
+                        <td>Equipment ID of the truck to resume</td>
+                    </tr>
+                </table>
+
+                <details class="curl-section">
+                    <summary>cURL Examples</summary>
+                    <pre><code># Resume default truck (MIX001)
+curl -X POST http://localhost:8001/api/truck/resume
+
+# Resume specific truck
+curl -X POST http://localhost:8001/api/truck/resume \
+  -H "Content-Type: application/json" \
+  -d '{"equipment_id": "MIX001"}'</code></pre>
+                </details>
+                <details class="curl-section">
+                    <summary>Response Example</summary>
+                    <pre><code>{
+  "status": "truck_resumed",
+  "equipment_id": "MIX001"
+}</code></pre>
+                </details>
+            </div>
+        </section>
+
+        <!-- Telemetry API -->
+        <section id="telemetry-api">
+            <h2>Telemetry Data API</h2>
+
+            <div class="endpoint get">
+                <span class="method get">GET</span>
+                <span class="path">/api/telemetry/equipment</span>
+                <p class="description">Retrieve equipment telemetry records from the database. High-frequency data captured at 10ms intervals.</p>
+
+                <h4>Query Parameters</h4>
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">equipment_id</code></td>
+                        <td>string</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                        <td>-</td>
+                        <td>Filter by specific equipment ID</td>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">limit</code></td>
+                        <td>integer</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                        <td>100</td>
+                        <td>Maximum number of records to return</td>
+                    </tr>
+                </table>
+
+                <details class="curl-section">
+                    <summary>cURL Examples</summary>
+                    <pre><code># Get latest 100 equipment telemetry records
+curl "http://localhost:8001/api/telemetry/equipment"
+
+# Get telemetry for specific equipment
+curl "http://localhost:8001/api/telemetry/equipment?equipment_id=MIX001"
+
+# Get last 500 records
+curl "http://localhost:8001/api/telemetry/equipment?limit=500"
+
+# Combined filters
+curl "http://localhost:8001/api/telemetry/equipment?equipment_id=EXC001&limit=50"</code></pre>
+                </details>
+            </div>
+
+            <div class="endpoint get">
+                <span class="method get">GET</span>
+                <span class="path">/api/telemetry/workers</span>
+                <p class="description">Retrieve worker telemetry records including location and health metrics.</p>
+
+                <h4>Query Parameters</h4>
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">worker_id</code></td>
+                        <td>string</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                        <td>-</td>
+                        <td>Filter by specific worker ID</td>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">limit</code></td>
+                        <td>integer</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                        <td>100</td>
+                        <td>Maximum number of records to return</td>
+                    </tr>
+                </table>
+
+                <details class="curl-section">
+                    <summary>cURL Examples</summary>
+                    <pre><code># Get latest worker telemetry
+curl "http://localhost:8001/api/telemetry/workers"
+
+# Get telemetry for specific worker
+curl "http://localhost:8001/api/telemetry/workers?worker_id=W001"
+
+# Get more records
+curl "http://localhost:8001/api/telemetry/workers?limit=200"</code></pre>
+                </details>
+            </div>
+
+            <div class="endpoint get">
+                <span class="method get">GET</span>
+                <span class="path">/api/telemetry/environment</span>
+                <p class="description">Retrieve environment telemetry records (temperature, humidity, air quality, etc.).</p>
+
+                <h4>Query Parameters</h4>
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">limit</code></td>
+                        <td>integer</td>
+                        <td><span class="badge badge-optional">Optional</span></td>
+                        <td>100</td>
+                        <td>Maximum number of records to return</td>
+                    </tr>
+                </table>
+
+                <details class="curl-section">
+                    <summary>cURL Examples</summary>
+                    <pre><code># Get latest environment telemetry
+curl "http://localhost:8001/api/telemetry/environment"
+
+# Get more records
+curl "http://localhost:8001/api/telemetry/environment?limit=500"</code></pre>
+                </details>
+            </div>
+        </section>
+
+        <!-- Data Models -->
+        <section id="data-models">
+            <h2>Data Models</h2>
+
+            <div class="card">
+                <h3>Equipment Types</h3>
+                <table>
+                    <tr>
+                        <th>ID</th>
+                        <th>Type</th>
+                        <th>Default Location</th>
+                        <th>Notes</th>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">EXC001</code></td>
+                        <td>Excavator</td>
+                        <td>(50, 25)</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">CRANE001</code></td>
+                        <td>Crane</td>
+                        <td>(100, 50)</td>
+                        <td>Has restricted zone</td>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">MIX001</code></td>
+                        <td>Concrete Mixer</td>
+                        <td>(150, 75)</td>
+                        <td>Follows predefined route, supports kill switch</td>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">BULL001</code></td>
+                        <td>Bulldozer</td>
+                        <td>(75, 100)</td>
+                        <td>-</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3>Workers</h3>
+                <table>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Tracked Metrics</th>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">W001</code></td>
+                        <td>Muniraju</td>
+                        <td>Location, Heart Rate, Body Temp, PPE Status</td>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">W002</code></td>
+                        <td>Siddha</td>
+                        <td>Location, Heart Rate, Body Temp, PPE Status</td>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">W003</code></td>
+                        <td>Ranga</td>
+                        <td>Location, Heart Rate, Body Temp, PPE Status</td>
+                    </tr>
+                    <tr>
+                        <td><code class="inline-code">W004</code></td>
+                        <td>Peddanna</td>
+                        <td>Location, Heart Rate, Body Temp, PPE Status</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3>Assembly Points (Emergency Evacuation)</h3>
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Location</th>
+                        <th>Capacity</th>
+                    </tr>
+                    <tr>
+                        <td>Assembly Point A</td>
+                        <td>(20, 20)</td>
+                        <td>20 workers</td>
+                    </tr>
+                    <tr>
+                        <td>Assembly Point B</td>
+                        <td>(280, 20)</td>
+                        <td>20 workers</td>
+                    </tr>
+                    <tr>
+                        <td>Assembly Point C</td>
+                        <td>(20, 180)</td>
+                        <td>20 workers</td>
+                    </tr>
+                    <tr>
+                        <td>Assembly Point D</td>
+                        <td>(280, 180)</td>
+                        <td>20 workers</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3>Environment Metrics</h3>
+                <table>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Unit</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td>temperature</td>
+                        <td>°C</td>
+                        <td>Ambient temperature</td>
+                    </tr>
+                    <tr>
+                        <td>humidity</td>
+                        <td>%</td>
+                        <td>Relative humidity</td>
+                    </tr>
+                    <tr>
+                        <td>wind_speed</td>
+                        <td>km/h</td>
+                        <td>Wind speed</td>
+                    </tr>
+                    <tr>
+                        <td>air_quality</td>
+                        <td>AQI</td>
+                        <td>Air Quality Index (0-100+)</td>
+                    </tr>
+                    <tr>
+                        <td>noise_level</td>
+                        <td>dB</td>
+                        <td>Ambient noise level</td>
+                    </tr>
+                    <tr>
+                        <td>dust_level</td>
+                        <td>%</td>
+                        <td>Dust concentration (triggers emergency at high levels)</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3>Truck Route Configuration</h3>
+                <p>The concrete mixer follows a predefined route loaded from <code class="inline-code">truck_route.json</code>:</p>
+                <pre><code>{
+  "route": [
+    [150, 0],
+    [150, 10],
+    [150, 20],
+    ...
+    [150, 200]
+  ]
+}</code></pre>
+                <p style="margin-top: 1rem; color: var(--text-muted);">
+                    Alternative routes available: <code class="inline-code">truck_route_correct.json</code>, <code class="inline-code">truck_route_wrong_route.json</code>
+                </p>
+            </div>
+        </section>
+
+        <!-- Complete Workflow Example -->
+        <section id="workflow">
+            <h2>Complete Workflow Example</h2>
+            <div class="card">
+                <pre><code>#!/bin/bash
+# Complete workflow example
+
+BASE_URL="http://localhost:8001"
+
+# 1. Start operations
+echo "Starting operations..."
+curl -X POST $BASE_URL/api/start-operations
+
+# 2. Wait and get dashboard data
+sleep 2
+echo "\nGetting dashboard data..."
+curl $BASE_URL/api/dashboard-data | jq .
+
+# 3. Monitor equipment telemetry
+echo "\nGetting equipment telemetry..."
+curl "$BASE_URL/api/telemetry/equipment?equipment_id=MIX001&limit=10" | jq .
+
+# 4. Test kill switch
+echo "\nActivating kill switch on MIX001..."
+curl -X POST $BASE_URL/api/truck/kill
+
+sleep 3
+
+echo "\nResuming truck..."
+curl -X POST $BASE_URL/api/truck/resume
+
+# 5. Test emergency system
+echo "\nTriggering emergency..."
+curl -X POST $BASE_URL/api/trigger-emergency \
+  -H "Content-Type: application/json" \
+  -d '{"dust_level": 95}'
+
+sleep 5
+
+echo "\nClearing emergency..."
+curl -X POST $BASE_URL/api/clear-emergency
+
+# 6. Stop operations
+echo "\nStopping operations..."
+curl -X POST $BASE_URL/api/stop-operations</code></pre>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <p>Construction Digital Twin API Documentation</p>
+        <p>Server: Flask on port 8001 | Database: SQLite | Telemetry Interval: 10ms</p>
+    </footer>
+</body>
+</html>

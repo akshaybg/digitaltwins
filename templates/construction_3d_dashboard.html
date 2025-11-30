@@ -444,6 +444,37 @@
         </div>
     </div>
 
+    <!-- Health polling: update site status based on /health endpoint -->
+    <script>
+        async function updateHealthStatus() {
+            try {
+                const res = await fetch('/health');
+                if (!res.ok) throw new Error('Health request failed');
+                const data = await res.json();
+                const el = document.getElementById('site-status');
+                if (!el) return;
+                const running = data.app_running;
+                const telemetry = data.telemetry_running;
+                el.textContent = running ? 'Running' : 'Stopped';
+                el.style.color = running ? '#00ff88' : '#ff4757';
+                // Add tooltip with telemetry info
+                el.title = `Telemetry: ${telemetry ? 'on' : 'off'} • Equipments: ${data.equipment_count} • Workers: ${data.worker_count}`;
+            } catch (err) {
+                const el = document.getElementById('site-status');
+                if (el) {
+                    el.textContent = 'Offline';
+                    el.style.color = '#ffa502';
+                    el.title = 'Health endpoint unreachable';
+                }
+                console.debug('Health poll error', err);
+            }
+        }
+
+        // Run once on load and then poll every 5 seconds
+        updateHealthStatus();
+        setInterval(updateHealthStatus, 5000);
+    </script>
+
     <script>
         // Global variables
         let scene, camera, renderer, controls;
