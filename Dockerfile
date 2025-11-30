@@ -22,5 +22,5 @@ ENV AUTO_START=1
 # Expose port
 EXPOSE 8001
 
-# Gunicorn command (3 workers, 4 threads each)
-CMD ["gunicorn", "-b", "0.0.0.0:${PORT}", "--workers", "3", "--threads", "4", "construction_digital_twin:app"]
+# Gunicorn command (3 workers, 4 threads each). Use shell for $PORT expansion
+CMD ["sh", "-c", "gunicorn -b 0.0.0.0:${PORT:-8001} --workers 3 --threads 4 construction_digital_twin:app"]
